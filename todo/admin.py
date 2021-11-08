@@ -3,6 +3,6 @@ from .models import Todo
 # Register your models here.
 
 class TodoAdmin(admin.ModelAdmin):
-    list_display = ("title", "description", "completed")
+    list_display = ("title", "description", "completed", "start", "end", "remind_me")
 
 admin.site.register(Todo, TodoAdmin)
