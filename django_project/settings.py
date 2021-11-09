@@ -40,7 +40,6 @@ INSTALLED_APPS = [
     'todo.apps.TodoConfig',
     'corsheaders',
     'rest_framework',
-    'new_todo.apps.NewTodoConfig',
     'djoser',
     'rest_framework_simplejwt',
     'accounts.apps.AccountsConfig',

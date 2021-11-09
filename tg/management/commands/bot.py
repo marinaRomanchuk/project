@@ -59,16 +59,6 @@ def do_echo(update: Update, context: CallbackContext):
     )
     m.save()
 
-    t = Todo(
-        title = "Meeting",
-        description = "I want to see my friends together",
-        completed = False,
-        start = datetime.date.today(),
-        end = datetime.date.today(),
-        remind_me = True
-    )
-    t.save()
-
     reply_text = f'Ваш ID = {chat_id}\n{text}'
     update.message.reply_text(
         text=reply_text,
@@ -104,7 +94,7 @@ def do_see(update: Update, context: CallbackContext):
 
     count = Todo.objects.count()
     update.message.reply_text(
-        text=f'У вас {count} событий',
+        text=f'У вас {count} заданий',
     )
 
     obj = Todo.objects.all()
@@ -113,6 +103,54 @@ def do_see(update: Update, context: CallbackContext):
             text=f'Title: {obj[i].title} \nDescription: {obj[i].description} \nStart date: {obj[i].start} \nEnd date'
                  f': {obj[i].end} \nComplited: {obj[i].completed}',
         )
+
+@log_errors
+def do_see_completed(update: Update, context: CallbackContext):
+    chat_id = update.message.chat_id
+
+    p, _ = Profile.objects.get_or_create(
+        external_id=chat_id,
+        defaults={
+            'name': update.message.from_user.username
+        }
+    )
+
+    count = Todo.objects.filter(completed=True).count()
+    update.message.reply_text(
+        text=f'У вас {count} законченных заданий',
+    )
+
+    obj = Todo.objects.filter(completed=True).all()
+    for i in range(len(obj)):
+        update.message.reply_text(
+            text=f'Title: {obj[i].title} \nDescription: {obj[i].description} \nStart date: {obj[i].start} \nEnd date'
+                 f': {obj[i].end} \nComplited: {obj[i].completed}',
+        )
+
+
+@log_errors
+def do_see_not_completed(update: Update, context: CallbackContext):
+    chat_id = update.message.chat_id
+
+    p, _ = Profile.objects.get_or_create(
+        external_id=chat_id,
+        defaults={
+            'name': update.message.from_user.username
+        }
+    )
+
+    count = Todo.objects.filter(completed=False).count()
+    update.message.reply_text(
+        text=f'У вас {count} незаконченных заданий',
+    )
+
+    obj = Todo.objects.filter(completed=False).all()
+    for i in range(len(obj)):
+        update.message.reply_text(
+            text=f'Title: {obj[i].title} \nDescription: {obj[i].description} \nStart date: {obj[i].start} \nEnd date'
+                 f': {obj[i].end} \nComplited: {obj[i].completed}',
+        )
+
 
 @log_errors
 def do_new(update: Update, context: CallbackContext):
@@ -158,13 +196,27 @@ def title_delete(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 @log_errors
+def title_update(update: Update, context: CallbackContext):
+    text = update.message.text
+
+    c = Todo.objects.filter(title=text).get().completed
+
+    Todo.objects.filter(title=text).update(completed=not c)
+
+    update.message.reply_text(
+        text=f'Обновлено',
+    )
+    return ConversationHandler.END
+
+
+@log_errors
 def title(update: Update, context: CallbackContext):
     text = update.message.text
     global tit
     tit = str(text)
 
     update.message.reply_text(
-        text=f'Введите description',
+        text=f'Введите описание',
     )
     return DESCRIPTION
 
@@ -176,7 +228,7 @@ def description(update: Update, context: CallbackContext):
 
     reply_keyboard = [['True', 'False']]
     update.message.reply_text(
-        text=f'Введите completed',
+        text=f'Задача уже выполнена?',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
     )
     return COMPLETED
@@ -188,7 +240,7 @@ def completed(update: Update, context: CallbackContext):
     compl = bool(text)
 
     update.message.reply_text(
-        text=f'Введите start date',
+        text=f'Введите дату начала',
     )
     return START_DATE
 
@@ -212,7 +264,7 @@ def end_date(update: Update, context: CallbackContext):
 
     reply_keyboard = [['True', 'False']]
     update.message.reply_text(
-        text=f'Введите remind',
+        text=f'Напомнить?',
         reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
     )
     return REMIND
@@ -232,7 +284,7 @@ def remind(update: Update, context: CallbackContext):
         remind_me=rem
     )
     t.save()
-    update.message.reply_text('Okay')
+    update.message.reply_text('Задание добавлено')
     return ConversationHandler.END
 
 @log_errors
@@ -292,7 +344,15 @@ class Command(BaseCommand):
             },
             fallbacks=[CommandHandler('cancel', cancel)]
         )
+        updater.dispatcher.add_handler(conv_handler)
 
+        conv_handler = ConversationHandler(
+            entry_points=[CommandHandler('update', do_delete)],
+            states={
+                0: [MessageHandler(Filters.text, title_update)],
+            },
+            fallbacks=[CommandHandler('cancel', cancel)]
+        )
         updater.dispatcher.add_handler(conv_handler)
 
         message_handler_count = CommandHandler('count', do_count)
@@ -301,8 +361,11 @@ class Command(BaseCommand):
         message_handler_see = CommandHandler('see', do_see)
         updater.dispatcher.add_handler(message_handler_see)
 
-        message_handler_new = CommandHandler('delete', do_delete)
-        updater.dispatcher.add_handler(message_handler_new)
+        message_handler_see = CommandHandler('completed', do_see_completed)
+        updater.dispatcher.add_handler(message_handler_see)
+
+        message_handler_see = CommandHandler('notcompleted', do_see_not_completed)
+        updater.dispatcher.add_handler(message_handler_see)
 
         message_handler = MessageHandler(Filters.text, do_echo)
         updater.dispatcher.add_handler(message_handler)
